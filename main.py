@@ -99,10 +99,25 @@ class Spring(BaseBonus):
         self.image = pg.image.load('img/spring_1.png')
 
 class Hat(BaseBonus):
-    ...
+    def __init__(self, plat: 'BasePlatform'):
+        super().__init__('img/hat_0.png', plat)
+        self.image_left = pg.image.load("img/hat_left.png")
+        self.image_right = pg.transform.flip(self.image_left, True, False)
+        
+    def update(self):
+        super().update()
+        
+    def on_collision(self, player: Player):
+        super().on_collision(player)
 
-class Jetpack(Sprite):
-    ...
+class Jetpack(BaseBonus):
+    def __init__(self, plat: 'BasePlatform'):
+        super().__init__('img/jetpack_0.png', plat)
+        self.image_right = pg.transform.flip(self.image, True, False)
+        self.image_left = self.image
+        
+    def on_collision(self, player: Player):
+        super().on_collision(player)
 
 class BasePlatform(Sprite):
     def on_collision(self, player):
@@ -114,7 +129,7 @@ class BasePlatform(Sprite):
 
     def attach_bonus(self):
         if random.randint(0, 100) > 50:
-            Bonus = random.choice([Spring])
+            Bonus = random.choice([Spring, Hat, Jetpack])
             obj = Bonus(self)
             platforms.add(obj)
 
