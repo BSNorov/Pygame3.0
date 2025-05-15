@@ -1,8 +1,12 @@
-import pygame as pg
 import random
 
+import pygame as pg
+
+FPS = 60
+
 pg.init()
-W, H = 480, 640
+
+W, H = 480, 800
 display = pg.display.set_mode((W, H))
 
 GRAVITY = 1
@@ -14,7 +18,8 @@ score = 0
 font_name = pg.font.match_font('Comic Sans', True, False)
 font = pg.font.Font(font_name, 36)
 
-def draw_text(text: str, x, y):
+
+def draw_text(text: str, x: int, y: int):
     score_text = font.render(text, True, (0, 0, 0))
     display.blit(score_text, (x, y))
 
@@ -25,16 +30,20 @@ class Sprite(pg.sprite.Sprite):
         self.image = pg.image.load(image_path)
         self.rect = self.image.get_rect(center=(x, y))
         self.dead = False
-    
+
     def update(self):
         super().update()
-        
+
     def draw(self):
         display.blit(self.image, self.rect)
-        
+
+    def collide_with_border(self):
+        return self.rect.left < 0 or self.rect.right > W or self.rect.top < 0 or self.rect.bottom > H
+
     def kill(self):
         self.dead = True
         super().kill()
+
 
 class Player(Sprite):
     def __init__(self):
@@ -43,7 +52,6 @@ class Player(Sprite):
         self.image_left = self.image
         self.image_right = pg.transform.flip(self.image, True, False)
         self.speed = 0
-
 
     def update(self):
         if self.dead:
@@ -60,19 +68,25 @@ class Player(Sprite):
             self.rect.left = 0
         if self.rect.right < 0:
             self.rect.right = W
+
         self.speed += GRAVITY
         self.rect.y += self.speed
+        if self.rect.y > H:
+            self.kill()
 
     def draw(self):
         if self.dead:
-            self.rect.y = H // 2
+            # self.rect.y = H // 2
+            draw_text('Game Over', W // 2 - 70, H // 2 - 10)
         else:
             display.blit(self.image, self.rect)
 
     def pick_up(self, player, bonus: 'BaseBonus'):
         if player.rect.colliderect(bonus.rect) and not self.using_bonus:
+            bonus.on_collision(player)
             self.using_bonus = True
             return True
+
 
 class BaseBonus(Sprite):
     def __init__(self, image_path, plat: 'BasePlatform'):
@@ -85,36 +99,64 @@ class BaseBonus(Sprite):
         super().__init__(x, y, image_path)
         self.platform = plat
         self.dx = self.rect.x - self.platform.rect.x
+        self.player: Player = None
+        self.power = -50
+        self.duration = FPS * 5
 
     def on_collision(self, player):
-        global score
-        score += 1000
-        self.kill()
+        if not player.using_bonus:
+            global score
+            self.player = player
+
+            score += 1000
 
     def update(self):
         self.rect.x = self.platform.rect.x + self.dx
-        if self.platform.dead:
+        if self.platform.dead and not self.player:
             self.kill()
+        if self.player:
+            self.rect.y = self.player.rect.y
+            self.rect.left = self.player.rect.right
+            self.duration -= 1
+            if self.duration > 0:
+                self.player.speed = self.power
+            else:
+                self.kill()
+            if self.player.speed < 0:
+                self.image = self.image_left
+                self.rect.left = self.player.rect.right
+            if self.player.speed > 0:
+                self.image = self.image_right
+                self.rect.right = self.player.rect.left
+
 
 class Spring(BaseBonus):
     def __init__(self, plat):
         super().__init__('img/spring.png', plat)
 
     def on_collision(self, player):
-        player.speed = -50
-        self.image = pg.image.load('img/spring_1.png')
+        # super().on_collision(player)
+
+        if not player.using_bonus:
+            player.speed = -50
+            self.image = pg.image.load('img/spring_1.png')
+
+    def update(self):
+        super().update()
+
 
 class Hat(BaseBonus):
     def __init__(self, plat: 'BasePlatform'):
         super().__init__('img/hat_0.png', plat)
-        self.image_left = pg.image.load("img/hat_left.png")
+        self.image_left = pg.image.load('img/hat_left.png')
         self.image_right = pg.transform.flip(self.image_left, True, False)
-        
+
     def update(self):
         super().update()
-        
+
     def on_collision(self, player: Player):
         super().on_collision(player)
+
 
 class Jetpack(BaseBonus):
     def __init__(self, plat: 'BasePlatform'):
@@ -122,27 +164,38 @@ class Jetpack(BaseBonus):
         self.image_right = pg.transform.flip(self.image, True, False)
         self.image_left = self.image
 
-
-    def on_collision(self, player: Player):
+    def on_collision(self, player):
         super().on_collision(player)
+
+
+bonuses = pg.sprite.Group()
+
 
 class BasePlatform(Sprite):
     def on_collision(self, player):
         player.speed = JUMP
 
     def update(self):
+        super().update()
         if self.rect.top > H:
             self.kill()
+            spawn_platform()
 
     def attach_bonus(self):
-        if random.randint(0, 100) > 50:
-            Bonus = random.choice([Spring, Hat, Jetpack])
+        if random.randint(0, 100) > 70:
+            Bonus = random.choice([
+                Spring,
+                Hat,
+                Jetpack
+            ])
             obj = Bonus(self)
-            platforms.add(obj)
+            bonuses.add(obj)
+
 
 class NormalPlatform(BasePlatform):
     def __init__(self, x, y):
         super().__init__(x, y, 'img/green.png')
+
 
 class SpringPlatform(BasePlatform):
     def __init__(self, x, y):
@@ -151,18 +204,21 @@ class SpringPlatform(BasePlatform):
     def on_collision(self, player):
         player.speed = 1.3 * JUMP
 
+
 class BreakablePlatform(BasePlatform):
     def __init__(self, x, y):
         super().__init__(x, y, 'img/red.png')
 
     def on_collision(self, player):
         player.speed = JUMP
+        # self.animate_break()
         self.kill()
+
 
 class MovingPlatform(BasePlatform):
     def __init__(self, x, y):
         super().__init__(x, y, 'img/blue.png')
-        self.direction = random.choice([-1, 1])
+        self.direction = random.choice([-1, 1])  # 1 for right, -1 for left
         self.speed = 3
 
     def update(self):
@@ -171,15 +227,18 @@ class MovingPlatform(BasePlatform):
         if self.rect.right > W or self.rect.left < 0:
             self.direction *= -1
 
+
 platforms = pg.sprite.Group()
-bonuses = pg.sprite.Group()
+
 
 def spawn_platform():
     platform = platforms.sprites()[-1]
     y = platform.rect.y - random.randint(MIN_GAP, MAX_GAP)
     x = random.randint(0, W - PLATFORM_WIDTH)
     types = [
-        MovingPlatform, BreakablePlatform, SpringPlatform,
+        MovingPlatform,
+        BreakablePlatform,
+        SpringPlatform,
         NormalPlatform
     ]
     Plat = random.choice(types)
@@ -187,45 +246,75 @@ def spawn_platform():
     platform.attach_bonus()
     platforms.add(platform)
 
+
+class BaseEnemy(Sprite):
+    def update(self):
+        if self.rect.y > H:
+            self.kill()
+
+    def on_collision(self, player):
+        player.kill()
+
+
+doodle = Player()
+platform = NormalPlatform(W // 2 - PLATFORM_WIDTH // 2, H - 50)
+platforms.add(platform)
+platform.attach_bonus()
+
+enemies = pg.sprite.Group()
+
+
 def is_top_collision(player: Player, platform: BasePlatform):
     if player.rect.colliderect(platform.rect):
         if player.speed > 0:
             if player.rect.bottom < platform.rect.bottom:
                 platform.on_collision(player)
+                return True
 
-platform = NormalPlatform(W // 2 - PLATFORM_WIDTH // 2, H - 50)
-platforms.add(platform)
-
-doodle = Player()
 
 def main():
+    passed_time = 0
     while True:
-        #1
+        # 1
         for e in pg.event.get():
             if e.type == pg.QUIT:
                 return
-        #2
+        # 2
         doodle.update()
         platforms.update()
+        enemies.update()
+        bonuses.update()
+        pg.sprite.spritecollide(doodle, platforms, False, collided=is_top_collision)
+        hit_enemy = pg.sprite.spritecollide(doodle, enemies, False)
+        pg.sprite.spritecollide(doodle, bonuses, False, collided=doodle.pick_up)
+
+        if hit_enemy:
+            doodle.kill()
+
         if len(platforms) < 25:
             spawn_platform()
-        pg.sprite.spritecollide(doodle, platforms, False, collided=is_top_collision)
-        pg.sprite.spritecollide(doodle, bonuses, False, collided=doodle.pick_up)
         if doodle.speed < 0 and doodle.rect.bottom < H / 2:
             doodle.rect.y -= doodle.speed
+
             global score
             score += 1
             for platform in platforms:
                 platform.rect.y -= doodle.speed
-            for bonus in bonuses:
-                bonus.rect.y -= doodle.speed
-        #3
+            for e in enemies:
+                e.rect.y -= doodle.speed
+            for b in bonuses:
+                b.rect.y -= doodle.speed
+
+        # 3
         display.fill('white')
         platforms.draw(display)
-        bonuses.draw(display)
+        enemies.draw(display)
         doodle.draw()
+        bonuses.draw(display)
+        draw_text(f'Score:{score}', 10, 10)
         pg.display.update()
-        pg.time.delay(1000 // 60)
+        passed_time += pg.time.delay(1000 // FPS)
+
 
 if __name__ == '__main__':
     main()
