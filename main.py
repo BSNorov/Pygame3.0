@@ -135,7 +135,6 @@ class Spring(BaseBonus):
         super().__init__('img/spring.png', plat)
 
     def on_collision(self, player):
-        # super().on_collision(player)
 
         if not player.using_bonus:
             player.speed = -50
@@ -211,7 +210,6 @@ class BreakablePlatform(BasePlatform):
 
     def on_collision(self, player):
         player.speed = JUMP
-        # self.animate_break()
         self.kill()
 
 
@@ -229,7 +227,6 @@ class MovingPlatform(BasePlatform):
 
 
 platforms = pg.sprite.Group()
-
 
 def spawn_platform():
     platform = platforms.sprites()[-1]
@@ -251,7 +248,7 @@ class BaseEnemy(Sprite):
     def update(self):
         if self.rect.y > H:
             self.kill()
-
+            
     def on_collision(self, player):
         player.kill()
 
@@ -260,8 +257,6 @@ doodle = Player()
 platform = NormalPlatform(W // 2 - PLATFORM_WIDTH // 2, H - 50)
 platforms.add(platform)
 platform.attach_bonus()
-
-enemies = pg.sprite.Group()
 
 
 def is_top_collision(player: Player, platform: BasePlatform):
@@ -285,11 +280,7 @@ def main():
         enemies.update()
         bonuses.update()
         pg.sprite.spritecollide(doodle, platforms, False, collided=is_top_collision)
-        hit_enemy = pg.sprite.spritecollide(doodle, enemies, False)
         pg.sprite.spritecollide(doodle, bonuses, False, collided=doodle.pick_up)
-
-        if hit_enemy:
-            doodle.kill()
 
         if len(platforms) < 25:
             spawn_platform()
