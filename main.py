@@ -248,7 +248,7 @@ class BaseEnemy(Sprite):
     def update(self):
         if self.rect.y > H:
             self.kill()
-            
+
     def on_collision(self, player):
         player.kill()
 
@@ -277,7 +277,7 @@ def main():
         # 2
         doodle.update()
         platforms.update()
-        enemies.update()
+
         bonuses.update()
         pg.sprite.spritecollide(doodle, platforms, False, collided=is_top_collision)
         pg.sprite.spritecollide(doodle, bonuses, False, collided=doodle.pick_up)
@@ -291,15 +291,12 @@ def main():
             score += 1
             for platform in platforms:
                 platform.rect.y -= doodle.speed
-            for e in enemies:
-                e.rect.y -= doodle.speed
             for b in bonuses:
                 b.rect.y -= doodle.speed
 
         # 3
         display.fill('white')
         platforms.draw(display)
-        enemies.draw(display)
         doodle.draw()
         bonuses.draw(display)
         draw_text(f'Score:{score}', 10, 10)
