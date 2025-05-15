@@ -45,6 +45,8 @@ class Player(Sprite):
 
 
     def update(self):
+        if self.dead:
+            return
         keys = pg.key.get_pressed()
         if keys[pg.K_LEFT]:
             self.rect.x -= 5
@@ -61,7 +63,7 @@ class Player(Sprite):
         self.rect.y += self.speed
 
     def draw(self):
-        if self.rect.y > H:
+        if self.dead:
             self.rect.y = H // 2
         else:
             display.blit(self.image, self.rect)
@@ -89,8 +91,8 @@ class BaseBonus(Sprite):
             self.kill()
 
 class Spring(BaseBonus):
-    def __init__(self):
-        super().__init__('img/spring.png')
+    def __init__(self, plat):
+        super().__init__('img/spring.png', plat)
 
     def on_collision(self, player):
         player.speed = -50
@@ -102,18 +104,19 @@ class Hat(BaseBonus):
 class Jetpack(Sprite):
     ...
 
-class BasePlatform(pg.sprite.Sprite):
-    def __init__(self, x, y, sprite):
-        super().__init__()
-        self.image = pg.image.load(sprite)
-        self.rect = self.image.get_rect(topleft=(x, y))
-
+class BasePlatform(Sprite):
     def on_collision(self, player):
         player.speed = JUMP
 
     def update(self):
         if self.rect.top > H:
             self.kill()
+
+    def attach_bonus(self):
+        if random.randint(0, 100) > 50:
+            Bonus = random.choice([Spring])
+            obj = Bonus(self)
+            platforms.add(obj)
 
 class NormalPlatform(BasePlatform):
     def __init__(self, x, y):
