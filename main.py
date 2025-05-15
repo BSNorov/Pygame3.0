@@ -39,6 +39,7 @@ class Sprite(pg.sprite.Sprite):
 class Player(Sprite):
     def __init__(self):
         super().__init__(W // 2, H // 2, 'img/doodle_left.png')
+        self.using_bonus = False
         self.image_left = self.image
         self.image_right = pg.transform.flip(self.image, True, False)
         self.speed = 0
@@ -67,6 +68,11 @@ class Player(Sprite):
             self.rect.y = H // 2
         else:
             display.blit(self.image, self.rect)
+
+    def pick_up(self, player, bonus: 'BaseBonus'):
+        if player.rect.colliderect(bonus.rect) and not self.using_bonus:
+            self.using_bonus = True
+            return True
 
 class BaseBonus(Sprite):
     def __init__(self, image_path, plat: 'BasePlatform'):
@@ -115,7 +121,8 @@ class Jetpack(BaseBonus):
         super().__init__('img/jetpack_0.png', plat)
         self.image_right = pg.transform.flip(self.image, True, False)
         self.image_left = self.image
-        
+
+
     def on_collision(self, player: Player):
         super().on_collision(player)
 
@@ -165,6 +172,7 @@ class MovingPlatform(BasePlatform):
             self.direction *= -1
 
 platforms = pg.sprite.Group()
+bonuses = pg.sprite.Group()
 
 def spawn_platform():
     platform = platforms.sprites()[-1]
@@ -202,15 +210,19 @@ def main():
         if len(platforms) < 25:
             spawn_platform()
         pg.sprite.spritecollide(doodle, platforms, False, collided=is_top_collision)
+        pg.sprite.spritecollide(doodle, bonuses, False, collided=doodle.pick_up)
         if doodle.speed < 0 and doodle.rect.bottom < H / 2:
             doodle.rect.y -= doodle.speed
             global score
             score += 1
             for platform in platforms:
                 platform.rect.y -= doodle.speed
+            for bonus in bonuses:
+                bonus.rect.y -= doodle.speed
         #3
         display.fill('white')
         platforms.draw(display)
+        bonuses.draw(display)
         doodle.draw()
         pg.display.update()
         pg.time.delay(1000 // 60)
